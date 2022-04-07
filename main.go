@@ -59,79 +59,107 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-	// TODO: Reduce users to those who will receive Emails today. Avoid excess work
-	//users := GetUsersToEmail(users)
+	users = GetUsersToEmail(users)
 	slugs := GetCategorySlugSet(users.Users)
 	if len(users.Users) == 0 {
 		return
 	}
 
 	cToPs := make(chan CategoryToPortfolios)
-	go func(api *godabble.Api, slugs []CategorySlug, out chan CategoryToPortfolios) {
-		defer close(out)
-		for _, slug := range slugs {
-			c, err := api.CategoryPage(string(slug))
-			if err == nil {
-				out <- CategoryToPortfolios{
-					category:   slug,
-					portfolios: GetPortfolioSlugs(c),
-				}
-			} else {
-				fmt.Println("Error retrieving category page. Error:", err.Error())
-			}
-		}
-	}(api, slugs, cToPs)
+	go GetCategoryPages(api, slugs, cToPs)
 
-	cpMap, pChan := ProcessCategoryToPortfolios(cToPs)
+	cpMap := ProcessCategoryToPortfolios(cToPs)
+	pChan := GetPortfolioKeys(cpMap)
+
 	portfolios := make(chan *godabble.PortfolioPage)
-	go func(api *godabble.Api, slugs []PortfolioSlug, out chan *godabble.PortfolioPage) {
-		defer close(out)
-		for _, pSlug := range slugs {
-			p, err := api.PortfolioPage(string(pSlug))
-			if err == nil {
-				out <- p
-			} else {
-				fmt.Printf("Error retrieving PortfolioPage for %s. Error: %s\n", string(pSlug), err.Error())
-			}
-		}
-	}(api, pChan, portfolios)
+	go GetPortfolioPages(api, pChan, portfolios)
 	info := Recombine(cpMap, portfolios)
 
 	// Gather contents for Emails of each User
 	Emails := make(chan EmailContent)
-	go func(in []EmailSubscriber, out chan EmailContent, info map[CategorySlug]CategoryToEmailInformation) {
-		defer close(out)
-		for _, u := range in {
-			n, h := ConstructUserInformation(u, info)
-			out <- EmailContent{
-				Email:    u.Email,
-				Name:     u.Name,
-				news:     n,
-				holdings: h,
-			}
-		}
-	}(users.Users, Emails, info)
+	go AssembleEmailContent(users.Users, Emails, info)
 
 	// Send Email
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	go func(in chan EmailContent, sender *Emailer, wg *sync.WaitGroup) {
-		defer wg.Done()
-		for e := range in {
-			err := sender.SendEmail(
-				e.Name,
-				e.Email,
-				ConstructEmail(e),
-			)
-			if err != nil {
-				fmt.Printf("failed to send Email to %s<%s>. Error: %s\n", e.Name, e.Email, err.Error())
-			}
-		}
-
-	}(Emails, ConstructEmailer(), &wg)
+	go SendEmails(Emails, ConstructEmailer(), &wg)
 	wg.Wait()
 }
 
+// GetUsersToEmail calculates who to email based on their EmailFrequency
+func GetUsersToEmail(e *EmailList) *EmailList {
+	// TODO: Reduce users to those who will receive Emails today. Avoid excess work
+	return e
+}
+
+// GetCategoryPages calls the dabble api for a list of categories and sends each category along with all the PortfolioSlug(s).
+func GetCategoryPages(api *godabble.Api, slugs []CategorySlug, out chan CategoryToPortfolios) {
+	defer close(out)
+	for _, slug := range slugs {
+		c, ps := GetCategoryAndPortfolios(api, slug)
+		if len(ps) > 0 {
+			out <- CategoryToPortfolios{
+				category:   slug,
+				portfolios: GetPortfolioSlugs(c),
+			}
+		}
+	}
+}
+
+// GetCategoryAndPortfolios retrieves the CategoryPage for a CategorySlug and parse out the relevant PortfolioSlug(s).
+func GetCategoryAndPortfolios(api *godabble.Api, s CategorySlug) (*godabble.CategoryPage, []PortfolioSlug) {
+	c, err := api.CategoryPage(string(s))
+	if err == nil {
+		return c, GetPortfolioSlugs(c)
+	} else {
+		fmt.Println("Error retrieving category page. Error:", err.Error())
+		return c, []PortfolioSlug{}
+	}
+}
+
+// GetPortfolioPages retrieves the PortfolioPage from a list of PortfolioSlug(s) and sends to a channel. Closes out channel.
+func GetPortfolioPages(api *godabble.Api, slugs []PortfolioSlug, out chan *godabble.PortfolioPage) {
+	defer close(out)
+	for _, pSlug := range slugs {
+		p, err := api.PortfolioPage(string(pSlug))
+		if err == nil {
+			out <- p
+		} else {
+			fmt.Printf("Error retrieving PortfolioPage for %s. Error: %s\n", string(pSlug), err.Error())
+		}
+	}
+}
+
+// AssembleEmailContent constructs EmailContent for a list of EmailSubscriber(s) based on a map of Category -> information. Closes out channel.
+func AssembleEmailContent(in []EmailSubscriber, out chan EmailContent, info map[CategorySlug]CategoryToEmailInformation) {
+	defer close(out)
+	for _, u := range in {
+		n, h := ConstructUserInformation(u, info)
+		out <- EmailContent{
+			Email:    u.Email,
+			Name:     u.Name,
+			news:     n,
+			holdings: h,
+		}
+	}
+}
+
+// SendEmails from a channel of EmailContent using a specific Emailer. Performs Done() on sync.WaitGroup.
+func SendEmails(in chan EmailContent, sender *Emailer, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for e := range in {
+		err := sender.SendEmail(
+			e.Name,
+			e.Email,
+			ConstructEmail(e),
+		)
+		if err != nil {
+			fmt.Printf("failed to send Email to %s<%s>. Error: %s\n", e.Name, e.Email, err.Error())
+		}
+	}
+}
+
+// ConstructEmail constructs a HTML email from an EmailContent.
 func ConstructEmail(content EmailContent) string {
 	lines := make([]string, len(content.news)+len(content.holdings))
 	for i, n := range content.news {
@@ -150,6 +178,7 @@ func ConstructEmail(content EmailContent) string {
 	return fmt.Sprintf("<html>Welcome %s, here's your news\n <ul>%s</ul></html>", content.Name, strings.Join(lines, "\n"))
 }
 
+// ConstructUserInformation builds the relevant News and Holding(s) for an EmailSubscriber based on their category interests.
 func ConstructUserInformation(u EmailSubscriber, info map[CategorySlug]CategoryToEmailInformation) ([]godabble.News, []godabble.Holding) {
 	var n []godabble.News
 	var h []godabble.Holding
@@ -183,6 +212,7 @@ func ConstructUserInformation(u EmailSubscriber, info map[CategorySlug]CategoryT
 	return news, h
 }
 
+// FilterNewsAfter returns the godabble.News that was published after the time.
 func FilterNewsAfter(nn []godabble.News, t time.Time) []godabble.News {
 	news := make([]godabble.News, len(nn))
 	j := 0
@@ -196,6 +226,9 @@ func FilterNewsAfter(nn []godabble.News, t time.Time) []godabble.News {
 	return news
 }
 
+// Recombine creates a map of CategorySlug to relevant, category-specific, email information (News and Holdings). For
+// each Portfolio page, add News and Holdings to each relevant category (based on cpMap). Categories will have multiple
+// portfolios, must aggregate News and Holdings.
 func Recombine(cpMap map[PortfolioSlug][]CategorySlug, portfolios chan *godabble.PortfolioPage) map[CategorySlug]CategoryToEmailInformation {
 	result := make(map[CategorySlug]CategoryToEmailInformation)
 	for portfolio := range portfolios {
@@ -221,19 +254,17 @@ func Recombine(cpMap map[PortfolioSlug][]CategorySlug, portfolios chan *godabble
 	return Reduce(result)
 }
 
+// Reduce the CategoryToEmailInformation to eliminate duplicate Holding and News.
 func Reduce(m map[CategorySlug]CategoryToEmailInformation) map[CategorySlug]CategoryToEmailInformation {
 	for k, info := range m {
-		m[k] = *ReduceCategoryToEmailInformation(&info)
+		info.holdings = ReduceHoldings(info.holdings)
+		info.news = ReduceNews(info.news)
+		m[k] = info
 	}
 	return m
 }
 
-func ReduceCategoryToEmailInformation(c *CategoryToEmailInformation) *CategoryToEmailInformation {
-	c.holdings = ReduceHoldings(c.holdings)
-	c.news = ReduceNews(c.news)
-	return c
-}
-
+// ReduceNews based on godabble.News.Slug
 func ReduceNews(n []godabble.News) []godabble.News {
 	nn := make(map[string]godabble.News)
 	for i, newZ := range n {
@@ -249,6 +280,7 @@ func ReduceNews(n []godabble.News) []godabble.News {
 	return n
 }
 
+// ReduceHoldings based on godabble.Holding.Slug
 func ReduceHoldings(h []godabble.Holding) []godabble.Holding {
 	hh := make(map[string]godabble.Holding)
 	for i, hold := range h {
@@ -264,23 +296,35 @@ func ReduceHoldings(h []godabble.Holding) []godabble.Holding {
 	return h
 }
 
-func ProcessCategoryToPortfolios(ins chan CategoryToPortfolios) (map[PortfolioSlug][]CategorySlug, []PortfolioSlug) {
+// ProcessCategoryToPortfolios converts CategoryToPortfolios into a mapping of PortfolioSlug to the CategorySlug(s) that
+//  are interested in the Portfolio.
+func ProcessCategoryToPortfolios(ins chan CategoryToPortfolios) map[PortfolioSlug][]CategorySlug {
 	cpMap := make(map[PortfolioSlug][]CategorySlug)
-	var pChan []PortfolioSlug
 	for cToP := range ins {
 		// Add to portfolio -> category list
 		for _, p := range cToP.portfolios {
 			_, ok := cpMap[p]
 			if !ok {
 				cpMap[p] = []CategorySlug{} // make([]CategorySlug)
-				pChan = append(pChan, p)
 			}
 			cpMap[p] = append(cpMap[p], cToP.category)
 		}
 	}
-	return cpMap, pChan
+	return cpMap
 }
 
+// GetPortfolioKeys from a map of PortfolioSlug -> []CategorySlug
+func GetPortfolioKeys(cpMap map[PortfolioSlug][]CategorySlug) []PortfolioSlug {
+	pChan := make([]PortfolioSlug, len(cpMap))
+	i := 0
+	for p, _ := range cpMap {
+		pChan[i] = p
+		i++
+	}
+	return pChan
+}
+
+// GetPortfolioSlugs from the Portfolio within a CategoryPage
 func GetPortfolioSlugs(c *godabble.CategoryPage) []PortfolioSlug {
 	result := make([]PortfolioSlug, len(c.Portfolios))
 	for i, portfolio := range c.Portfolios {
@@ -289,6 +333,7 @@ func GetPortfolioSlugs(c *godabble.CategoryPage) []PortfolioSlug {
 	return result
 }
 
+// GetEmailList builds an EmailList based on a JSON file.
 func GetEmailList(jsonFilePath string) (*EmailList, error) {
 	var payload EmailList
 
@@ -304,6 +349,7 @@ func GetEmailList(jsonFilePath string) (*EmailList, error) {
 	return &payload, nil
 }
 
+// GetCategorySlugSet gets all unique categories from a list of EmailSubscriber(s).
 func GetCategorySlugSet(s []EmailSubscriber) []CategorySlug {
 
 	// Find unique slugs
@@ -318,7 +364,8 @@ func GetCategorySlugSet(s []EmailSubscriber) []CategorySlug {
 			}
 		}
 	}
-	// return slugs.keys()
+
+	// Return keys
 	j := 0
 	result := make([]CategorySlug, len(slugs))
 	for c, _ := range slugs {
