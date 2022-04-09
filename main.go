@@ -15,7 +15,7 @@ type EmailFrequency string
 const (
 	Daily    EmailFrequency = "daily"
 	Biweekly                = "biweekly"
-	weekly                  = "weekly"
+	Weekly                  = "weekly"
 )
 
 type CategoryToPortfolios struct {
@@ -85,8 +85,18 @@ func main() {
 
 // GetUsersToEmail calculates who to email based on their EmailFrequency
 func GetUsersToEmail(e *EmailList) *EmailList {
-	// TODO: Reduce users to those who will receive Emails today. Avoid excess work
+	e.Users = FilterUsersOnEmailFrequency(e.Users)
 	return e
+}
+
+func FilterUsersOnEmailFrequency(users []EmailSubscriber) []EmailSubscriber {
+	today := time.Now().Weekday()
+	for i, u := range users {
+		if !ShouldEmailOnDay(today, u.Frequency) {
+			users = append(users[:i], users[i+1:]...)
+		}
+	}
+	return users
 }
 
 // AssembleEmailContent constructs EmailContent for a list of EmailSubscriber(s) based on a map of Category -> information. Closes out channel.
@@ -254,6 +264,27 @@ func GetEmailList(jsonFilePath string) (*EmailList, error) {
 		return &payload, fmt.Errorf("failed parsing JSON from file %s, error: %w", jsonFilePath, err)
 	}
 	return &payload, nil
+}
+
+func ShouldEmailOnDay(d time.Weekday, f EmailFrequency) bool {
+	switch f {
+	case Daily:
+		return d == time.Sunday ||
+			d == time.Monday ||
+			d == time.Tuesday ||
+			d == time.Wednesday ||
+			d == time.Thursday ||
+			d == time.Friday ||
+			d == time.Saturday
+	case Biweekly:
+		return d == time.Sunday || d == time.Wednesday
+
+	case Weekly:
+		return d == time.Sunday
+
+	default:
+		return false
+	}
 }
 
 // GetCategorySlugSet gets all unique categories from a list of EmailSubscriber(s).
