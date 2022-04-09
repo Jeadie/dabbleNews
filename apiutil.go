@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/Jeadie/godabble"
+	"log"
 )
 
 type CategorySlug string
@@ -53,7 +54,11 @@ func ReduceNews(n []godabble.News) []godabble.News {
 		// If exists, remove
 		_, ok := nn[newZ.Slug]
 		if ok {
-			n = append(n[:i], n[i+1:]...)
+			if i+1 == len(n) {
+				n = n[:i]
+			} else {
+				n = append(n[:i], n[i+1:]...)
+			}
 			// Else, add to map for next time
 		} else {
 			nn[newZ.Slug] = newZ
@@ -69,7 +74,11 @@ func ReduceHoldings(h []godabble.Holding) []godabble.Holding {
 		// If exists, remove
 		_, ok := hh[hold.Slug]
 		if ok {
-			h = append(h[:i], h[i+1:]...)
+			if i+1 == len(h) {
+				h = h[:i]
+			} else {
+				h = append(h[:i], h[i+1:]...)
+			}
 			// Else, add to map for next time
 		} else {
 			hh[hold.Slug] = hold
@@ -95,5 +104,6 @@ func GetPortfolioKeys(cpMap map[PortfolioSlug][]CategorySlug) []PortfolioSlug {
 		pChan[i] = p
 		i++
 	}
+	log.Printf("%d unique portfolio keys\n", len(pChan))
 	return pChan
 }

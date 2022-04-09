@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Jeadie/godabble"
 	"io/ioutil"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -57,8 +58,11 @@ func main() {
 		return
 	}
 	users = GetUsersToEmail(users)
+	log.Printf("%d users \n", len(users.Users))
 	slugs := GetCategorySlugSet(users.Users)
+	log.Printf("%d categories \n", len(slugs))
 	if len(users.Users) == 0 {
+		log.Println("No users")
 		return
 	}
 
@@ -136,11 +140,11 @@ func ConstructEmail(content EmailContent) string {
 			i--
 			continue
 		}
-		lines[i] = fmt.Sprintf("<li> %s: <a href='https://dabble.com%s>Read more</a> <li>", n.Title, n.Slug)
+		lines[i] = fmt.Sprintf("<li> %s: <a href='https://dabble.com%s'>Read more</a> </li>", n.Title, n.Slug)
 	}
 	for i, h := range content.holdings {
 		lines[i+len(content.news)] = fmt.Sprintf(
-			"<li> Holding %s. 24 hour movement %2.2f, 7 Day movement %2.2f <li>",
+			"<li> Holding %s. 24 hour movement %2.2f, 7 Day movement %2.2f </li>",
 			h.Title, h.Movement24h, h.Movement7d,
 		)
 	}
@@ -159,11 +163,16 @@ func ConstructUserInformation(u EmailSubscriber, info map[CategorySlug]CategoryT
 	n = ReduceNews(n)
 	h = ReduceHoldings(h)
 
+	log.Printf("User %s, has %d news before time filtering\n", u.Name, len(n))
+	log.Printf("User %s, has %d holdings before time filtering\n", u.Name, len(h))
 	// Reduce to those of time relevance
 	// Time format "2022-04-05T21:39:16Z"
 	// TODO: obey correct time Frequency
-	now := time.Now().Add(-24 * time.Hour)
+	now := time.Now().UTC().Add(-24 * time.Hour)
 	news := FilterNewsAfter(n, now)
+
+	log.Printf("User %s, has %d news after time filtering\n", u.Name, len(news))
+	log.Printf("User %s, has %d holdings after time filtering\n", u.Name, len(h))
 
 	// Sort Holdings with largest 7Day or 24H difference.
 	//if u.Frequency == Daily {
@@ -183,12 +192,12 @@ func ConstructUserInformation(u EmailSubscriber, info map[CategorySlug]CategoryT
 
 // FilterNewsAfter returns the godabble.News that was published after the time.
 func FilterNewsAfter(nn []godabble.News, t time.Time) []godabble.News {
-	news := make([]godabble.News, len(nn))
+	var news []godabble.News
 	j := 0
 	for _, n := range nn {
 		n_t, err := time.Parse(time.RFC3339, n.PublishedOn)
 		if err == nil && n_t.After(t) {
-			news[j] = n
+			news = append(news, n)
 			j++
 		}
 	}
@@ -226,9 +235,13 @@ func Recombine(cpMap map[PortfolioSlug][]CategorySlug, portfolios chan *godabble
 // Reduce the CategoryToEmailInformation to eliminate duplicate Holding and News.
 func Reduce(m map[CategorySlug]CategoryToEmailInformation) map[CategorySlug]CategoryToEmailInformation {
 	for k, info := range m {
+		log.Printf("Category %s has %d holdings before reduction\n", k, len(info.holdings))
+		log.Printf("Category %s has %d news before reduction\n", k, len(info.news))
 		info.holdings = ReduceHoldings(info.holdings)
 		info.news = ReduceNews(info.news)
 		m[k] = info
+		log.Printf("Category %s has %d holdings after reduction\n", k, len(info.holdings))
+		log.Printf("Category %s has %d news after reduction\n", k, len(info.news))
 	}
 	return m
 }
@@ -238,6 +251,8 @@ func Reduce(m map[CategorySlug]CategoryToEmailInformation) map[CategorySlug]Cate
 func ProcessCategoryToPortfolios(ins chan CategoryToPortfolios) map[PortfolioSlug][]CategorySlug {
 	cpMap := make(map[PortfolioSlug][]CategorySlug)
 	for cToP := range ins {
+		log.Printf("Category %s has %d portfolios\n", cToP.category, len(cToP.portfolios))
+
 		// Add to portfolio -> category list
 		for _, p := range cToP.portfolios {
 			_, ok := cpMap[p]
@@ -247,6 +262,7 @@ func ProcessCategoryToPortfolios(ins chan CategoryToPortfolios) map[PortfolioSlu
 			cpMap[p] = append(cpMap[p], cToP.category)
 		}
 	}
+	log.Printf("%d Unique portfolios \n", len(cpMap))
 	return cpMap
 }
 
