@@ -12,9 +12,10 @@ const defaultTextPart = "Here's what you need to know"
 type Emailer struct {
 	client *mailjet.Client
 	from   *mailjet.RecipientV31
+	stage  EnvironmentStage
 }
 
-func ConstructEmailer() *Emailer {
+func ConstructEmailer(stage EnvironmentStage) *Emailer {
 	return &Emailer{
 		client: mailjet.NewMailjetClient(
 			os.Getenv("MJ_APIKEY_PUBLIC"),
@@ -25,11 +26,12 @@ func ConstructEmailer() *Emailer {
 			Email: "jackeadie@duck.com",
 			Name:  "Jack",
 		},
+		stage: stage,
 	}
 }
 
 func (e Emailer) SendEmail(name, email, htmlContent string) error {
-	_ = mailjet.MessagesV31{Info: []mailjet.InfoMessagesV31{
+	messages := mailjet.MessagesV31{Info: []mailjet.InfoMessagesV31{
 		{
 			From: e.from,
 			To: &mailjet.RecipientsV31{
@@ -43,7 +45,12 @@ func (e Emailer) SendEmail(name, email, htmlContent string) error {
 			HTMLPart: htmlContent,
 		},
 	}}
-	fmt.Println(htmlContent)
-	//_, err := e.client.SendMailV31(&messages)
-	return nil
+	if e.stage == Production {
+		_, err := e.client.SendMailV31(&messages)
+		return err
+	} else {
+		fmt.Println("Not in production. Email will not be sent. Content is below.")
+		fmt.Println(htmlContent)
+		return nil
+	}
 }

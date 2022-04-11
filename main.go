@@ -310,3 +310,11 @@ func GetCategorySlugSet(s []EmailSubscriber) []CategorySlug {
 	}
 	return result
 }
+
+func GetStage() EnvironmentStage {
+	v := os.Getenv("ENVIRONMENT_STAGE")
+	if len(v) == 0 {
+		return Local
+	}
+	return EnvironmentStage(v)
+}

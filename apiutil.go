@@ -54,7 +54,7 @@ func ReduceNews(n []godabble.News) []godabble.News {
 		// If exists, remove
 		_, ok := nn[newZ.Slug]
 		if ok {
-			if i+1 == len(n) {
+			if i >= len(n) {
 				n = n[:i]
 			} else {
 				n = append(n[:i], n[i+1:]...)
@@ -74,7 +74,7 @@ func ReduceHoldings(h []godabble.Holding) []godabble.Holding {
 		// If exists, remove
 		_, ok := hh[hold.Slug]
 		if ok {
-			if i+1 == len(h) {
+			if i >= len(h) {
 				h = h[:i]
 			} else {
 				h = append(h[:i], h[i+1:]...)
