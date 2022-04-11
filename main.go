@@ -6,7 +6,7 @@ import (
 	"github.com/Jeadie/godabble"
 	"io/ioutil"
 	"log"
-	"strings"
+	"os"
 	"sync"
 	"time"
 )
@@ -19,6 +19,14 @@ const (
 	Weekly                  = "weekly"
 )
 
+type EnvironmentStage string
+
+const (
+	Production EnvironmentStage = "production"
+	Beta                        = "beta"
+	Local                       = "local"
+)
+
 type CategoryToPortfolios struct {
 	category   CategorySlug
 	portfolios []PortfolioSlug
@@ -26,13 +34,6 @@ type CategoryToPortfolios struct {
 
 type CategoryToEmailInformation struct {
 	category CategorySlug
-	news     []godabble.News
-	holdings []godabble.Holding
-}
-
-type EmailContent struct {
-	Email    string
-	Name     string
 	news     []godabble.News
 	holdings []godabble.Holding
 }
@@ -83,7 +84,7 @@ func main() {
 	// Send Email
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	go SendEmails(Emails, ConstructEmailer(), &wg)
+	go SendEmails(Emails, ConstructEmailer(GetStage()), &wg)
 	wg.Wait()
 }
 
@@ -111,8 +112,8 @@ func AssembleEmailContent(in []EmailSubscriber, out chan EmailContent, info map[
 		out <- EmailContent{
 			Email:    u.Email,
 			Name:     u.Name,
-			news:     n,
-			holdings: h,
+			News:     n,
+			Holdings: h,
 		}
 	}
 }
@@ -132,25 +133,6 @@ func SendEmails(in chan EmailContent, sender *Emailer, wg *sync.WaitGroup) {
 	}
 }
 
-// ConstructEmail constructs a HTML email from an EmailContent.
-func ConstructEmail(content EmailContent) string {
-	lines := make([]string, len(content.news)+len(content.holdings))
-	for i, n := range content.news {
-		if len(n.Slug) == 0 {
-			i--
-			continue
-		}
-		lines[i] = fmt.Sprintf("<li> %s: <a href='https://dabble.com%s'>Read more</a> </li>", n.Title, n.Slug)
-	}
-	for i, h := range content.holdings {
-		lines[i+len(content.news)] = fmt.Sprintf(
-			"<li> Holding %s. 24 hour movement %2.2f, 7 Day movement %2.2f </li>",
-			h.Title, h.Movement24h, h.Movement7d,
-		)
-	}
-	return fmt.Sprintf("<html>Welcome %s, here's your news\n <ul>%s</ul></html>", content.Name, strings.Join(lines, "\n"))
-}
-
 // ConstructUserInformation builds the relevant News and Holding(s) for an EmailSubscriber based on their category interests.
 func ConstructUserInformation(u EmailSubscriber, info map[CategorySlug]CategoryToEmailInformation) ([]godabble.News, []godabble.Holding) {
 	var n []godabble.News
@@ -168,7 +150,7 @@ func ConstructUserInformation(u EmailSubscriber, info map[CategorySlug]CategoryT
 	// Reduce to those of time relevance
 	// Time format "2022-04-05T21:39:16Z"
 	// TODO: obey correct time Frequency
-	now := time.Now().UTC().Add(-24 * time.Hour)
+	now := time.Now().UTC().Add(-124 * time.Hour)
 	news := FilterNewsAfter(n, now)
 
 	log.Printf("User %s, has %d news after time filtering\n", u.Name, len(news))

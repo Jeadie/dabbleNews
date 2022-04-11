@@ -1,0 +1,24 @@
+{{ define "Index" }}
+
+<html>
+    <h1>Welcome {{ .Name }}, here's your news</h1>
+
+    <h3>Your news</h3>
+    <ul>
+        {{ range .News }}
+        <li> {{ .Title }}
+            <a href='https://dabble.com{{ .Slug }}'>
+                Read more
+            </a>
+        </li>
+        {{ end }}
+    </ul>
+
+    <h3>Your holdings</h3>
+    <ul>
+        {{ range .Holdings }}
+            <li> Holding {{ .Title }}. Movement last 24 hours {{ .Movement24h }}, last 7 days {{ .Movement7d }}. </li>
+        {{ end }}
+    </ul>
+</html>
+{{ end }}
