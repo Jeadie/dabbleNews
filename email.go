@@ -17,7 +17,6 @@ type Emailer struct {
 
 func ConstructEmailer(stage EnvironmentStage) *Emailer {
 	return &Emailer{
-
 		client: mailjet.NewMailjetClient(os.Getenv("MJ_APIKEY_PUBLIC"), os.Getenv("MJ_APIKEY_PRIVATE")),
 		from: &mailjet.RecipientV31{
 			Email: "jackeadie@duck.com",
