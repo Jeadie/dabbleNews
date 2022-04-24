@@ -6,7 +6,7 @@
 </head>
 <body>
     <h1>Welcome {{ .Name }}, here's your news</h1>
-    <h3>Your news</h3>
+    <h2 class="leading-10 md:leading-12 text-3xl font-bold ">Your news</h2>
 
         <div class="grid grid-cols-1 mx-8" >
         {{ range .News }}
@@ -25,12 +25,75 @@
         {{ end }}
     </div>
 
-    <h3>Your holdings</h3>
-    <ul>
+
+    <h1 class="leading-10 md:leading-12 text-2xl font-bold ">Your holdings</h1>
+
+    <div class="grid grid-cols-6">
         {{ range .Holdings }}
-            <li> Holding {{ .Title }}. Movement last 24 hours {{ .Movement24h }}, last 7 days {{ .Movement7d }}. </li>
+
+            <div class="col-span-2 col-start-1 justify-self-end mr-3 pt-1.5">
+                <h2 class="leading-10 text-xl font-bold ">{{ .Title }}</h2>
+            </div>
+
+            <!-- price-->
+            <div class="pt-1.5 mr-3 rounded items-end inline-block col-span-1 justify-self-end mb-1">
+                <div class="flex flex-1 space-x-1 ">
+                    <p class="leading-10 text-2xl font-bold whitespace-nowrap">$ {{ .Price }}</p>
+                </div>
+            </div>
+
+            <!-- Holding change 7days-->
+            {{ if lt .Movement7d 0.0 }}
+                <div class="bg-red-100 py-1 pt-1.5 mx-1 px-2 rounded items-end inline-block col-span-1 mb-1 justify-self-center">
+                    <span class="mr-1 inline-block transform rotate-180" style="font-size: 0.8rem; width: 9px; height: 10px;">
+                        <svg width="9" height="10" viewBox="0 0 9 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8.81195 3.9561L4.95453 0.183895C4.7038 -0.0612983 4.2962 -0.0612983 4.04547 0.183895L0.188049 3.9561C-0.062683 4.20129 -0.062683 4.59989 0.188049 4.84508C0.438781 5.09028 0.846382 5.09028 1.09711 4.84508L3.85645 2.1467L3.8565 9.3713C3.8565 9.71834 4.14452 10 4.4994 10C4.85429 10 5.14231 9.71834 5.14231 9.3713L5.14226 2.1467L7.9016 4.84508C8.02761 4.96831 8.19219 5.02866 8.35678 5.02866C8.52136 5.02866 8.68594 4.96705 8.81195 4.84508C9.06268 4.59989 9.06268 4.20129 8.81195 3.9561Z" fill="#F43B3A">
+                            </path>
+                        </svg>
+                    </span>
+                    <p class="md:text-2xl leading-8 text-xl font-bold inline-block text-red-600">{{ .Movement7d }}%</p>
+                    <span class="opacity-70 mb-px inline-block ml-1 text-xs text-red-600">7d</span>
+                </div>
+            {{else }}
+
+                <div class="bg-green-100 py-1 pt-1.5 mx-1 px-2 rounded items-end inline-block col-span-1 mb-1 justify-self-center">
+                    <span class="mr-1 inline-block" style="font-size: 0.8rem; width: 9px; height: 10px;">
+                        <svg width="9" height="10" viewBox="0 0 9 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8.81195 3.9561L4.95453 0.183895C4.7038 -0.0612983 4.2962 -0.0612983 4.04547 0.183895L0.188049 3.9561C-0.062683 4.20129 -0.062683 4.59989 0.188049 4.84508C0.438781 5.09028 0.846382 5.09028 1.09711 4.84508L3.85645 2.1467L3.8565 9.3713C3.8565 9.71834 4.14452 10 4.4994 10C4.85429 10 5.14231 9.71834 5.14231 9.3713L5.14226 2.1467L7.9016 4.84508C8.02761 4.96831 8.19219 5.02866 8.35678 5.02866C8.52136 5.02866 8.68594 4.96705 8.81195 4.84508C9.06268 4.59989 9.06268 4.20129 8.81195 3.9561Z" fill="#01CC7A">
+                            </path>
+                        </svg>
+                    </span>
+                    <p class="md:text-2xl leading-8 text-xl font-bold inline-block text-green-600">{{ .Movement7d }}%</p>
+                    <span class="opacity-70 mb-px inline-block ml-1 text-xs text-green-600">7d</span>
+                </div>
+            {{ end }}
+
+            {{ if lt .Movement1y 0.0 }}
+            <div class="bg-red-100 py-1 pt-1.5 mx-1 px-2 rounded items-end inline-block col-span-1 mb-1 justify-self-center">
+                        <span class="mr-1 inline-block transform rotate-180" style="font-size: 0.8rem; width: 9px; height: 10px;">
+                            <svg width="9" height="10" viewBox="0 0 9 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8.81195 3.9561L4.95453 0.183895C4.7038 -0.0612983 4.2962 -0.0612983 4.04547 0.183895L0.188049 3.9561C-0.062683 4.20129 -0.062683 4.59989 0.188049 4.84508C0.438781 5.09028 0.846382 5.09028 1.09711 4.84508L3.85645 2.1467L3.8565 9.3713C3.8565 9.71834 4.14452 10 4.4994 10C4.85429 10 5.14231 9.71834 5.14231 9.3713L5.14226 2.1467L7.9016 4.84508C8.02761 4.96831 8.19219 5.02866 8.35678 5.02866C8.52136 5.02866 8.68594 4.96705 8.81195 4.84508C9.06268 4.59989 9.06268 4.20129 8.81195 3.9561Z" fill="#F43B3A">
+                                </path>
+                            </svg>
+                        </span>
+                <p class="md:text-2xl leading-8 text-xl font-bold inline-block text-red-600">{{ .Movement1y }}%</p>
+                <span class="opacity-70 mb-px inline-block ml-1 text-xs text-red-600">1y</span>
+            </div>
+            {{ else }}
+            <!-- holding change +ve 1y -->
+            <div class="bg-green-100 py-1 pt-1.5 mx-1 px-2 rounded items-end inline-block col-span-1 mb-1 justify-self-center">
+                        <span class="mr-1 inline-block" style="font-size: 0.8rem; width: 9px; height: 10px;">
+                            <svg width="9" height="10" viewBox="0 0 9 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8.81195 3.9561L4.95453 0.183895C4.7038 -0.0612983 4.2962 -0.0612983 4.04547 0.183895L0.188049 3.9561C-0.062683 4.20129 -0.062683 4.59989 0.188049 4.84508C0.438781 5.09028 0.846382 5.09028 1.09711 4.84508L3.85645 2.1467L3.8565 9.3713C3.8565 9.71834 4.14452 10 4.4994 10C4.85429 10 5.14231 9.71834 5.14231 9.3713L5.14226 2.1467L7.9016 4.84508C8.02761 4.96831 8.19219 5.02866 8.35678 5.02866C8.52136 5.02866 8.68594 4.96705 8.81195 4.84508C9.06268 4.59989 9.06268 4.20129 8.81195 3.9561Z" fill="#01CC7A">
+                                </path>
+                            </svg>
+                        </span>
+                <p class="md:text-2xl leading-8 text-xl font-bold inline-block text-green-600">{{ .Movement1y }}%</p>
+                <span class="opacity-70 mb-px inline-block ml-1 text-xs text-green-600">1y</span>
+            </div>
+            {{ end }}
         {{ end }}
-    </ul>
+    </div>
 </body>
 
 </html>
