@@ -1,20 +1,29 @@
 {{ define "Index" }}
 
 <html>
-<head></head>
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
 <body>
-
     <h1>Welcome {{ .Name }}, here's your news</h1>
     <h3>Your news</h3>
-    <ul>
+
+        <div class="grid grid-cols-1 mx-8" >
         {{ range .News }}
-        <li> {{ .Title }}
-            <a href="https://dabble.com{{ .Slug }}">
-                Read more
-            </a>
-        </li>
+            <div class=" col-span-1 mb-4 flex flex-col bg-white rounded-2xl shadow-xl shadow-slate-300/60 grid grid-cols-8 w-96" href="https://dabble.com{{ .Slug }}">
+                <div class="col-span-4 ">
+                    <a href="https://dabble.com{{ .Slug }}">
+                        <img style=" min-height: 100%; min-width: 100%; max-height: 300px" class="bg-contain rounded-t-2xl object-cover" src="{{ .Picture }}" />
+                    </a>
+                </div>
+                <div class="col-span-4 p-4">
+                    <p class="text-sm tracking-tight text-slate-400 leading-6">{{ .Title }}</p>
+                    <a href="https://dabble.com{{ .Slug }}"><p class="font-mono text-sm text-slate-600 mu-2">Read more</p></a>
+                </div>
+
+            </div>
         {{ end }}
-    </ul>
+    </div>
 
     <h3>Your holdings</h3>
     <ul>
